@@ -10,6 +10,7 @@ from scipy import stats
 
 __all__ = ['Parameter']
 
+
 class Parameter():
     """
     A model parameter with a prior.
@@ -18,7 +19,7 @@ class Parameter():
     sampling with a uniform distribution over the log of some scale parameter.
     Thus the user can specify a transformation to map between the value as seen
     by the physical functions and the value as seen by the sampling algorithm.
-    
+
     Priors can be specified from those built into scipy.stats.
     See the list here:
     https://docs.scipy.org/doc/scipy/reference/stats.html
@@ -53,15 +54,15 @@ class Parameter():
         parameter to the parameter as seen by the sampler.  E.g., for the log
         transform, the inverse_transform could be given as "lambda x: 10**x".
     """
-    
+
     # dictionary of recognized transformations and inverses
     _transforms = {'from_log': (lambda x: np.log10(x),
                                 lambda x: 10**x)}
-    
+
     def __init__(self, name, prior, transform=None, inverse_transform=None):
-        
+
         self.name = name
-        
+
         # parse prior
         if isinstance(prior, stats._distn_infrastructure.rv_frozen):
             self.prior = prior
@@ -84,7 +85,7 @@ class Parameter():
                                  "scipy.stats!".format(prior_name))
             # freeze in hyper-parameters
             self.prior = dist(**hp)
-            
+
         # parse transform
         if transform is None:
             self.transform = None
@@ -98,8 +99,9 @@ class Parameter():
             # spot check that...
             x = self.prior.rvs(size=50)
             if not np.all(np.isclose(x, inverse_transform(transform(x)))):
-                raise ValueError("transform and inverse_transform don't match!")
-            
+                raise ValueError(
+                    "transform and inverse_transform don't match!")
+
     def __call__(self, x):
         """
         Calculate the log prior at the given value.
@@ -122,11 +124,11 @@ class Parameter():
             return "<Parameter: {} ~ {}>".format(self.name, self.prior_str)
         else:
             return "<Parameter: {}>".format(self.name)
-    
+
     def sample(self, n):
         """
         Draws n samples from the prior distribution.
-        
+
         Parameters
         ----------
         n : int

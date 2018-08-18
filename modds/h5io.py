@@ -36,7 +36,7 @@ __all__ = ['HDF5Backend', 'parse_yaml']
 
 
 def get_version(package):
-    return pkg_resources.get_distribution(package).version    
+    return pkg_resources.get_distribution(package).version
 
 
 def visit(hdf5_file):
@@ -49,8 +49,8 @@ def visit(hdf5_file):
     """
     with h5py.File(hdf5_file, "r") as f:
         f.visititems(lambda key, value: print(key, value))
-            
-    
+
+
 def read_dataset(hdf5_file, path):
     """Return a stored dataset at the specified path.
 
@@ -91,7 +91,7 @@ def write_dataset(hdf5_file, path, data, overwrite=False):
         f[path] = data
         f.flush()
 
-        
+
 def initialize_dataset(hdf5_file, path, shape, maxshape=None,
                        compression="gzip", overwrite=False):
     """Initialize an array dataset at the specified path.
@@ -138,7 +138,7 @@ def read_object(hdf5_file, path):
     """
     with h5py.File(hdf5_file, "r") as f:
         return dill.loads(f[path].value.tostring())
-    
+
 
 def write_object(hdf5_file, path, obj, overwrite=False):
     """Store a generic python object at the specified path.
@@ -161,8 +161,8 @@ def write_object(hdf5_file, path, obj, overwrite=False):
         bytestring = dill.dumps(obj)
         f[path] = np.void(bytestring)
         f.flush()
-        
-        
+
+
 def read_group(hdf5_file, path):
     """Return a group at the specified path as a dictionary.
 
@@ -188,8 +188,8 @@ def read_group(hdf5_file, path):
             else:
                 raise ValueError("Unknown type: " + str(value))
         return group
-    
-    
+
+
 def write_group(hdf5_file, path, group, overwrite=False):
     """Write the group dictionary to the path on the hdf5 file.
 
@@ -220,8 +220,8 @@ def write_group(hdf5_file, path, group, overwrite=False):
             else:
                 f[new_path] = value
         f.flush()
-        
-                
+
+
 class HDF5Backend():
     """Manages an hdf5 file and defines the structure of saved MCMC runs.
 
@@ -274,11 +274,10 @@ class HDF5Backend():
             self.load(filename)
         else:
             assert (model is not None) and (settings is not None)
-            # write to and load file 
+            # write to and load file
             self.dump(filename, model, settings, overwrite=overwrite)
             self.load(filename)
 
-            
     def load(self, filename):
         """Sets the filename, reads the model, and sets the cosmology."""
         assert os.path.isfile(filename)
@@ -293,11 +292,11 @@ class HDF5Backend():
         cosmo_name = read_dataset(filename, "/settings/cosmo")
         self._cosmo = setCosmology(cosmo_name)
 
-        
     def dump(self, filename, model, settings, overwrite=False):
         """Stores the model/settings and initializes arrays."""
         if os.path.isfile(filename) and not overwrite:
-            raise ValueError(f"{filename} exists, do you want to overwrite it?")
+            raise ValueError(
+                f"{filename} exists, do you want to overwrite it?")
         f = filename
         write_object(f, "/model", model, overwrite=overwrite)
         write_dataset(f, "/version", get_version("colossus"),
@@ -320,13 +319,13 @@ class HDF5Backend():
                            maxshape=(nwalkers, None, ngrid),
                            overwrite=overwrite)
         write_dataset(f, "/state/niter", 0, overwrite=overwrite)
-        write_dataset(f, "/state/nacc", np.zeros(nwalkers), overwrite=overwrite)
-
+        write_dataset(f, "/state/nacc", np.zeros(nwalkers),
+                      overwrite=overwrite)
 
     def append_state(self, pos, lnp=None, ppc=None, lnl=None,
                      acceptances=None):
         """Append sampling results to the existing datasets.
-        
+
         Parameters
         ----------
         pos : array_like
@@ -368,7 +367,6 @@ class HDF5Backend():
                 x[:, -1] = lnl
             f.flush()
 
-            
     def sample(self, niter, pool=None):
         """Sample from the model for niter iterations, optionally with a user
         provided pool of workers.
@@ -404,11 +402,11 @@ class HDF5Backend():
                 self.append_state(new_pos, lnp=new_lnp, ppc=q_grid, lnl=new_lnl,
                                   acceptances=delta_nacc)
                 pbar.update()
-        
+
     @property
     def model(self):
         return self._model
-    
+
     @property
     def observables(self):
         return self._observables
@@ -424,7 +422,7 @@ class HDF5Backend():
     @property
     def ndim(self):
         return read_dataset(self.filename, "/ndim")
-        
+
     @property
     def shape(self):
         return self.nwalkers, self.niter, self.ndim
@@ -432,7 +430,7 @@ class HDF5Backend():
     @property
     def settings(self):
         return read_group(self.filename, "/settings")
-    
+
     @property
     def z(self):
         return read_dataset(self.filename, "/settings/z")
@@ -444,15 +442,15 @@ class HDF5Backend():
     @property
     def cosmo(self):
         return self._cosmo
-    
+
     @property
     def nwalkers(self):
         return read_dataset(self.filename, "/settings/nwalkers")
-    
+
     @property
     def chain(self):
         return read_dataset(self.filename, "/state/chain")
-    
+
     @property
     def niter(self):
         return read_dataset(self.filename, "/state/niter")
@@ -464,7 +462,7 @@ class HDF5Backend():
     @property
     def ppc(self):
         return read_dataset(self.filename, "/state/ppc")
-    
+
     @property
     def acceptance_fraction(self):
         return self.nacc / self.niter
@@ -476,8 +474,8 @@ class HDF5Backend():
     @property
     def lnp(self):
         return read_dataset(self.filename, "/state/lnp")
-    
-    
+
+
 def parse_yaml(filename, overwrite=False):
     """Read in a yaml file and construct an hdf5 output file."""
     with open(filename) as f:
@@ -509,7 +507,7 @@ def parse_yaml(filename, overwrite=False):
         z = config['settings']['z']
         cosmo_name = config['settings']['cosmo']
         cosmo = setCosmology(cosmo_name)
-        
+
         try:
             outer_term_name = config['model']['outer_term']
         except KeyError:
@@ -522,14 +520,15 @@ def parse_yaml(filename, overwrite=False):
                               M=1e12, c=10, z=z, mdef='vir')
                 profile = profile_dk14.getDK14ProfileWithOuterTerms(**kwargs)
             else:
-                raise NotImplementedError("Only supports outer terms with DK14.")
+                raise NotImplementedError(
+                    "Only supports outer terms with DK14.")
         else:
             profile_classes = dict('nfw', profile_nfw.NFWProfile,
                                    'einasto', profile_einasto.EinastoProfile,
                                    'dk14', profile_dk14.DK14Profile)
-            kwargs = dict(M=1e12, c=10, z=z, mdef='vir')            
+            kwargs = dict(M=1e12, c=10, z=z, mdef='vir')
             profile = profile_classes[profile_name](**kwargs)
-            
+
         try:
             constants = config['model']['constants']
         except KeyError:
@@ -544,7 +543,7 @@ def parse_yaml(filename, overwrite=False):
             rmax = np.amax(observables['r'])
             settings['r_grid'] = np.logspace(np.log10(rmin), np.log10(rmax),
                                              ngrid)
-        
+
         model = MeasurementModel(profile=profile, observables=observables,
                                  parameters=parameters, quantity=quantity,
                                  constants=constants)

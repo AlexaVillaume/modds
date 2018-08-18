@@ -12,7 +12,8 @@ import numpy as np
 from colossus.halo.profile_base import HaloDensityProfile
 from modds.parameter import Parameter
 
-__all__ = ['MeasurmentModel']
+__all__ = ['MeasurementModel']
+
 
 def lnlike_gauss(q_model, q, q_err):
     """
@@ -65,7 +66,7 @@ class MeasurementModel():
                        sigma='surfaceDensity', surfacedensity='surfaceDensity',
                        deltasigma='deltaSigma')
     _obskeys = ['r', 'q', 'q_err']
-    
+
     def __init__(self, profile, observables, quantity, parameters,
                  constants=None, lnlike=lnlike_gauss):
         # check this is an actual halo density profile
@@ -116,7 +117,7 @@ class MeasurementModel():
                     # need to do the inverse transform to physical values
                     new_pars[i] = p.inverse_transform(values[idx])
         return new_pars
-    
+
     def update(self, values):
         """Update the profile with the passed values.
 
@@ -138,11 +139,10 @@ class MeasurementModel():
             self.profile.update()
             return True
         except:
-            #TODO: catch the specific exception
+            # TODO: catch the specific exception
             # handle case where the halo density is too small
             return False
-        
-        
+
     def __call__(self, values, return_lnlike=False, return_model=False,
                  r_grid=None):
         """
@@ -170,7 +170,7 @@ class MeasurementModel():
         """
         # update profile with new values
         successful_update = self.update(values)
-        
+
         # calculate log prior, returning early on bad values
         lnp = 0
         for i, p in enumerate(self.parameters.values()):
@@ -183,7 +183,7 @@ class MeasurementModel():
                 return -np.inf, (None,)
             else:
                 return -np.inf
-            
+
         # calculate log likelihood
         r = self.observables['r']
         q = self.observables['q']
@@ -213,5 +213,3 @@ class MeasurementModel():
                 return lnp + lnl, (lnl,)
             else:
                 return lnp + lnl
-
-
