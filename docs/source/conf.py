@@ -17,9 +17,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.insert(0, os.path.abspath('..'))
 
 
 # -- General configuration ------------------------------------------------
@@ -34,7 +34,8 @@
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.imgmath'
+    'sphinx.ext.imgmath',
+    'sphinx.ext.napoleon'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -177,4 +178,5 @@ texinfo_documents = [
 
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/': None,
-                       'colossus': ('https://bdiemer.bitbucket.io/colossus/', None)}
+                       'https://bdiemer.bitbucket.io/colossus': None,
+                       'colossus': ('https://bdiemer.bitbucket.io/colossus', None)}

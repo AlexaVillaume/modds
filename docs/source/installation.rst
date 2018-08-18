@@ -2,9 +2,9 @@
 Installation
 ============
 
-Installing ModDS can currently be done by downloading the source through [GitHub](https://github.com/adwasser/modds) and running the setup script.
+Installing ModDS can currently be done by downloading the source through `GitHub <https://github.com/adwasser/modds>`_ and running the setup script.
 
-.. code-block::
+.. code::
 
    git clone https://github.com/adwasser/modds.git
    cd modds

@@ -2,5 +2,5 @@
 Parameter
 =========
 
-.. automodule:: modeling.parameter
+.. automodule:: modds.parameter
     :members:

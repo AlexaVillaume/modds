@@ -2,5 +2,5 @@
 Measurement
 ===========
 
-.. automodule:: modeling.measurement
+.. automodule:: modds.measurement
     :members:

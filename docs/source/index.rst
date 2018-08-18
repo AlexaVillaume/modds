@@ -7,7 +7,7 @@
 ModDS Documentation
 =================================
 
-ModDS is a code for specifying and sampling from Bayesian models of dark matter halos.  It uses `colossus<https://bdiemer.bitbucket.io/colossus/>`_ for physical halo models and `emcee<https://emcee.readthedocs.io/en/stable/>`_ for Markov chain Monte Carlo sampling.
+ModDS is a code for specifying and sampling from Bayesian models of dark matter halos.  It uses `colossus <https://bdiemer.bitbucket.io/colossus/>`_ for physical halo models and `emcee <https://emcee.readthedocs.io/en/stable/>`_ for Markov chain Monte Carlo sampling.
 
 .. toctree::
    :maxdepth: 2
