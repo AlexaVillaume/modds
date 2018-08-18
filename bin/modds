@@ -1,0 +1,108 @@
+#!/bin/env python
+
+import sys
+import argparse
+
+from modds.h5io import parse_yaml, HDF5Backend, get_version
+
+
+help_str = """
+--------------------------------------------------------------------------------
+modds
+version : {}
+
+DM profile fitting with colossus.
+--------------------------------------------------------------------------------
+
+""".format(get_version("modds"))
+
+
+def _info_string(filename):
+    f = HDF5Backend(filename)
+    info_str = 80 * "=" + '\n'
+    info_str += "modds\n"
+    info_str += "version : {}\n".format(get_version("modds"))
+    info_str += "nwalkers : {}, niterations : {}, ndim : {}\n".format(
+        f.nwalkers,
+        f.niter,
+        f.ndim)
+    info_str += 80 * "=" + '\n'
+    divide = 80 * "-" + '\n'
+    profile_class = str(f.model.profile.__class__).split("\'")[1].split('.')[-1]
+    info_str += "\n" + divide + f"Mass profile: {profile_class}\n" + divide
+    for name, p in f.model.parameters.items():
+        info_str += f"    {p}\n"
+    for const, value in f.model.constants.items():
+        info_str += "    " + const + " = " + str(value) + "\n"
+    info_str += "\n" + divide + "Settings\n" + divide
+    for key, value in f.settings.items():
+        info_str += "    " + key + " : " + str(value) + "\n"
+    return info_str
+
+parser = argparse.ArgumentParser(
+    description=help_str, formatter_class=argparse.RawDescriptionHelpFormatter)
+
+subparsers = parser.add_subparsers(help='Available commands')
+
+# init command
+parser_init = subparsers.add_parser("init", help="Construct a model")
+parser_init.set_defaults(command="init")
+parser_init.add_argument(
+    "config",
+    help="Config file in YAML format.  See docs for required entries.")
+parser_init.add_argument(
+    "--overwrite",
+    action="store_true",
+    help="If selected, overwrite existing hdf5 output file.")
+
+# info command
+parser_info = subparsers.add_parser("info", help="Quick info on the model.")
+parser_info.set_defaults(command="info")
+parser_info.add_argument("hdf5", help="hdf5 output file")
+
+# sample command
+parser_sample = subparsers.add_parser(
+    "sample", help="Sample from an existing model.")
+parser_sample.set_defaults(command="sample")
+parser_sample.add_argument("hdf5", help="hdf5 output file")
+parser_sample.add_argument(
+    "niter", type=int, help="Number of iterations to run.")
+parser_sample.add_argument(
+    "--threads", help="Number of threads to use.", default=None)
+
+# run command
+parser_run = subparsers.add_parser(
+    "run", help="Shortcut for init and sample for new model output.")
+parser_run.set_defaults(command="run")
+parser_run.add_argument(
+    "config",
+    help="Config file in YAML format.  See docs for required entries.")
+parser_run.add_argument("niter", type=int, help="Number of iterations to run.")
+parser_run.add_argument(
+    "--threads", help="Number of threads to use.", default=None)
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    try:
+        args.command
+    except AttributeError as e:
+        parser.print_help()
+        sys.exit()
+    
+    if args.command == "init":
+        f = parse_yaml(args.config, overwrite=args.overwrite)
+    elif args.command == "info":
+        print(_info_string(args.hdf5))
+    elif args.command == "sample":
+        f = HDF5Backend(args.hdf5)
+        pool = multiprocess.Pool(args.threads)
+        f.sample(args.niter, pool=pool)
+    elif args.command == "run":
+        f = parse_yaml(args.config, overwrite=args.overwrite)
+        pool = multiprocess.Pool(args.threads)
+        f.sample(args.niter, pool=pool)
+    else:
+        raise NotImplementedError("Command " + args.command +
+                                  " not implemented.")
+    

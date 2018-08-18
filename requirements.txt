@@ -1,0 +1,9 @@
+numpy
+scipy
+colossus
+h5py
+emcee
+ruamel.yaml
+dill
+multiprocess
+tqdm
