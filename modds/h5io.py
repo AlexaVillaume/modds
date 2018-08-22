@@ -296,7 +296,7 @@ class HDF5Backend():
         """Stores the model/settings and initializes arrays."""
         if os.path.isfile(filename) and not overwrite:
             raise ValueError(
-                f"{filename} exists, do you want to overwrite it?")
+                "{} exists, do you want to overwrite it?".format(filename))
         f = filename
         write_object(f, "/model", model, overwrite=overwrite)
         write_dataset(f, "/version", get_version("colossus"),

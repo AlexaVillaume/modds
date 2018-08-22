@@ -29,9 +29,9 @@ def _info_string(filename):
     info_str += 80 * "=" + '\n'
     divide = 80 * "-" + '\n'
     profile_class = str(f.model.profile.__class__).split("\'")[1].split('.')[-1]
-    info_str += "\n" + divide + f"Mass profile: {profile_class}\n" + divide
+    info_str += "\n" + divide + "Mass profile: {}\n".format(profile_class) + divide
     for name, p in f.model.parameters.items():
-        info_str += f"    {p}\n"
+        info_str += "    {}\n".format(p)
     for const, value in f.model.constants.items():
         info_str += "    " + const + " = " + str(value) + "\n"
     info_str += "\n" + divide + "Settings\n" + divide
