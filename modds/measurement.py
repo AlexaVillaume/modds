@@ -176,11 +176,14 @@ class MeasurementModel():
         for i, p in enumerate(self.parameters.values()):
             lnp += p(values[i])
         if not np.isfinite(lnp) or not successful_update:
+            q_grid = np.nan * np.ones(r_grid.shape)
             # handle different blob size returns
             if return_lnlike and return_model:
-                return -np.inf, (None, None)
-            elif return_lnlike or return_model:
-                return -np.inf, (None,)
+                return -np.inf, (-np.inf, q_grid)
+            elif return_lnlike:
+                return -np.inf, (-np.inf,)
+            elif return_model:
+                return -np.inf, (q_grid,)
             else:
                 return -np.inf
 

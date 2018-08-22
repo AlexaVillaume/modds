@@ -395,7 +395,7 @@ class HDF5Backend():
                 rstate = result[2]
                 blobs = result[3]
                 new_lnl = np.array([blobs[i][0] for i in range(nwalkers)])
-                q_grid = np.array([blobs[i][1] for i in range(nwalkers)])
+                q_grid = np.vstack([blobs[i][1] for i in range(nwalkers)])
                 delta_nacc = sampler.naccepted - old_nacc
                 # need to save as copy, default is a reference!
                 old_nacc = sampler.naccepted.copy()
