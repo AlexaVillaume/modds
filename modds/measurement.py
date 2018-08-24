@@ -54,10 +54,16 @@ class MeasurementModel():
         respectively.
     parameters : list of colossus.modeling.Parameter instances
     constants : dict
-        Map from constant name (str) to fixed physical value (float)
+        Map from constant name (str) to fixed physical value (float).
+        Should contain redshift (named "z") if not defined as a parameter
     lnlike : callable, optional
         Map from (q_model, q, q_err) to log likelihood at each point.  Defaults
         to a Gaussian likelihood, i.e., q ~ N(q_model, q_err**2)
+    priors : iterable, optional
+        List of functions, f(profile, **kwargs) -> log prior.
+        Additional priors to consider (e.g., halo mass concentration relation,
+        See examples in joint_priors.py.
+        Keywords should be either constants or parameters of the model.
     """
 
     # mapping of inputtable quantities to colossus halo profile function name
@@ -68,7 +74,7 @@ class MeasurementModel():
     _obskeys = ['r', 'q', 'q_err']
 
     def __init__(self, profile, observables, quantity, parameters,
-                 constants=None, lnlike=lnlike_gauss):
+                 constants=None, lnlike=lnlike_gauss, priors=None):
         # check this is an actual halo density profile
         assert isinstance(profile, HaloDensityProfile)
         self.profile = profile
@@ -95,10 +101,13 @@ class MeasurementModel():
             constants = {}
         self.constants = constants
         self.lnlike = lnlike
+        self.priors = priors
+        assert ("z" in self.constants) or ("z" in self.parameters)
 
-    def _get_required_parameters(self, values):
+        
+    def _get_required_parameters(self, sample):
         """The parameters the sampler sees are different than what colossus 
-        needs.  This glues the two together.  `values` are what the sampler 
+        needs.  This glues the two together.  `sample` is what the sampler 
         sees.
         """
         # construct array for profile prediction
@@ -112,18 +121,33 @@ class MeasurementModel():
                 # index into values for free parameters
                 idx = list(self.parameters.keys()).index(required_param)
                 if p.transform is None:
-                    new_pars[i] = values[idx]
+                    new_pars[i] = sample[idx]
                 else:
                     # need to do the inverse transform to physical values
-                    new_pars[i] = p.inverse_transform(values[idx])
+                    new_pars[i] = p.inverse_transform(sample[idx])
         return new_pars
 
-    def update(self, values):
+    
+    def _get_kwargs(self, sample):
+        """Construct a dictionary of keyword arguments from a point in sample
+        space.  Includes constant values.
+        """
+        kwargs = {}
+        for i, (name, p) in enumerate(self.parameters.items()):
+            if p.transform is not None:
+                kwargs[name] = p.inverse_transform(sample[i])
+            else:
+                kwargs[name] = sample[i]
+        kwargs = {**kwargs, **self.constants}
+        return kwargs
+
+    
+    def update(self, sample):
         """Update the profile with the passed values.
 
         Parameters
         ----------
-        values : array_like
+        sample : array_like
             Size of ndim, values as the sampler would see them (i.e., 
             transformed)        
 
@@ -133,7 +157,20 @@ class MeasurementModel():
             True if successful
         """
         # set new profile parameters and update
-        new_pars = self._get_required_parameters(values)
+        
+        new_pars = self._get_required_parameters(sample)
+        if 'z' in self.parameters:
+            # update redshift with new value
+            p = self.parameters['z']
+            idx = list(self.parameters.keys()).index('z')
+            if p.transform is not None:
+                z = p.inverse_transform(sample[idx])
+            else:
+                z = sample[idx]
+            self.profile.opt['z'] = z
+        else:
+            assert self.profile.opt['z'] == self.constants['z']
+        
         self.profile.setParameterArray(new_pars)
         try:
             self.profile.update()
@@ -143,14 +180,14 @@ class MeasurementModel():
             # handle case where the halo density is too small
             return False
 
-    def __call__(self, values, return_lnlike=False, return_model=False,
+    def __call__(self, sample, return_lnlike=False, return_model=False,
                  r_grid=None):
         """
         Calculate the log posterior probability for the model.
 
         Parameters
         ----------
-        values : array_like
+        sample : array_like
             length ndim array of transformed parameters
         return_lnlike : bool, optional
             if True, also return the log likelihood
@@ -169,12 +206,15 @@ class MeasurementModel():
             posterior predicted observable at the r_grid interpolation points
         """
         # update profile with new values
-        successful_update = self.update(values)
+        successful_update = self.update(sample)
 
         # calculate log prior, returning early on bad values
         lnp = 0
         for i, p in enumerate(self.parameters.values()):
-            lnp += p(values[i])
+            lnp += p(sample[i])
+        if self.priors is not None:
+            for prior in self.priors:
+                lnp += prior(self.profile, **self._get_kwargs(sample))
         if not np.isfinite(lnp) or not successful_update:
             q_grid = np.nan * np.ones(r_grid.shape)
             # handle different blob size returns

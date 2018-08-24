@@ -31,6 +31,7 @@ from colossus.halo import (profile_dk14, profile_outer, profile_nfw,
 
 from modds.parameter import Parameter
 from modds.measurement import MeasurementModel
+from modds import joint_priors
 
 __all__ = ['HDF5Backend', 'parse_yaml']
 
@@ -432,10 +433,6 @@ class HDF5Backend():
         return read_group(self.filename, "/settings")
 
     @property
-    def z(self):
-        return read_dataset(self.filename, "/settings/z")
-
-    @property
     def r_grid(self):
         return read_dataset(self.filename, "/settings/r_grid")
 
@@ -502,9 +499,25 @@ def parse_yaml(filename, overwrite=False):
             q_err = config['model']['observables']['q_err']
         observables = OrderedDict([('r', r), ('q', q), ('q_err', q_err)])
 
+        # construct constants dictionary
+        try:
+            constants = config['model']['constants']
+        except KeyError:
+            constants = None
+        
         # construct profile
         profile_name = config['model']['profile']
-        z = config['settings']['z']
+        if 'z' in constants:
+            z = constants['z']
+        else:
+            names = [p.name for p in parameters]
+            idx = names.index('z')
+            pz = parameters[idx]
+            if pz.transform is not None:
+                z = pz.inverse_transform(pz.prior.mean())
+            else:
+                z = pz.prior.mean()
+            
         cosmo_name = config['settings']['cosmo']
         cosmo = setCosmology(cosmo_name)
 
@@ -529,12 +542,20 @@ def parse_yaml(filename, overwrite=False):
             kwargs = dict(M=1e12, c=10, z=z, mdef='vir')
             profile = profile_classes[profile_name](**kwargs)
 
-        try:
-            constants = config['model']['constants']
-        except KeyError:
-            constants = None
         quantity = config['model']['quantity']
 
+        # construct any joint priors
+        if 'priors' in config['model']:
+            priors = []
+            for prior in config['model']['priors']:
+                try:
+                    priors.append(getattr(joint_priors, prior))
+                except:
+                    raise ValueError('{} not found as a valid joint '
+                                     'prior'.format(prior))
+        else:
+            priors = None
+                    
         # check for r_grid
         settings = config['settings']
         if isinstance(settings['r_grid'], int):
@@ -546,9 +567,12 @@ def parse_yaml(filename, overwrite=False):
 
         model = MeasurementModel(profile=profile, observables=observables,
                                  parameters=parameters, quantity=quantity,
-                                 constants=constants)
+                                 constants=constants, priors=priors)
 
-        outfilename = config['output']
+        if 'output' not in config:
+            outfilename = filename.split('.yaml')[0] + '.hdf5'
+        else:
+            outfilename = config['output']
         outfile = HDF5Backend(outfilename, model=model, settings=settings,
                               overwrite=overwrite)
         return outfile
