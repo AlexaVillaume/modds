@@ -98,11 +98,17 @@ if __name__ == "__main__":
         print(_info_string(args.hdf5))
     elif args.command == "sample":
         f = HDF5Backend(args.hdf5)
-        pool = multiprocess.Pool(args.threads)
+        if args.threads == 1:
+            pool = None
+        else:
+            pool = multiprocess.Pool(args.threads)
         f.sample(args.niter, pool=pool)
     elif args.command == "run":
         f = parse_yaml(args.config, overwrite=args.overwrite)
-        pool = multiprocess.Pool(args.threads)
+        if args.threads == 1:
+            pool = None
+        else:
+            pool = multiprocess.Pool(args.threads)
         f.sample(args.niter, pool=pool)
     else:
         raise NotImplementedError("Command " + args.command +

@@ -7,9 +7,11 @@ parameters of interest.
 """
 
 from collections import OrderedDict
-import numpy as np
 
+import numpy as np
+from scipy import optimize
 from colossus.halo.profile_base import HaloDensityProfile
+
 from modds.parameter import Parameter
 
 __all__ = ['MeasurementModel']
@@ -180,8 +182,15 @@ class MeasurementModel():
             # handle case where the halo density is too small
             return False
 
-    def __call__(self, sample, return_lnlike=False, return_model=False,
-                 r_grid=None):
+    def __call__(self, sample,
+                 return_lnlike=False,
+                 return_profile=False,
+                 return_vir=False,
+                 return_sp=False,
+                 r_grid=None,
+                 mdef="vir",
+                 log_rsp_search_min=2.5,
+                 log_rsp_search_max=3.5):
         """
         Calculate the log posterior probability for the model.
 
@@ -191,23 +200,35 @@ class MeasurementModel():
             length ndim array of transformed parameters
         return_lnlike : bool, optional
             if True, also return the log likelihood
-        return_model : bool, optional
+        return_profile : bool, optional
             if True, also return the model interpolated on the specified grid
+        return_vir : bool, optional
+            if True, also return the halo virial mass and concentration
+        return_sp : bool, optional
+            if True, also return the halo splashback radius and steepest slope
         r_grid : array_like, optional
             Radial interpolation grid for when caching the posterior prediction
+        mdef : str, optional
+            halo virial mass definition
+        log_rsp_search_min : float, optional
+            log of kpc, minimum radius to search for rsp
+        log_rsp_search_max : float, optional
+            log of kpc, maximum radius to search for rsp
 
         Returns
         -------
         lnpost : float
             log of posterior probability
-        lnl : float, optional
-            log likelihood, only returned if return_lnlike is True
-        model_grid : array_like, optional
-            posterior predicted observable at the r_grid interpolation points
+        blobs : tuple
+            tuple of optional returns, ordered as (lnlike, profile, Mvir, cvir, 
+            rsp, gamma_min)
         """
+        return_blobs = np.any([return_lnlike, return_profile, return_vir,
+                               return_sp])
+        
         # update profile with new values
         successful_update = self.update(sample)
-
+        
         # calculate log prior, returning early on bad values
         lnp = 0
         for i, p in enumerate(self.parameters.values()):
@@ -216,19 +237,24 @@ class MeasurementModel():
             for prior in self.priors:
                 lnp += prior(self.profile, **self._get_kwargs(sample))
         if not np.isfinite(lnp) or not successful_update:
-            q_grid = np.nan * np.ones(r_grid.shape)
-            # handle different blob size returns
-            if return_lnlike and return_model:
-                return -np.inf, (-np.inf, q_grid)
-            elif return_lnlike:
-                return -np.inf, (-np.inf,)
-            elif return_model:
-                return -np.inf, (q_grid,)
-            else:
-                return -np.inf
+            if return_blobs:
+                # construct rejected blobs
+                blobs = []
+                if return_lnlike:
+                    blobs.append(np.nan)
+                if return_profile:
+                    blobs.append(np.nan * np.ones(r_grid.shape))
+                if return_vir:
+                    blobs.append(np.nan)
+                    blobs.append(np.nan)
+                if return_sp:
+                    blobs.append(np.nan)
+                    blobs.append(np.nan)
+                return -np.inf, tuple(blobs)
 
         # calculate log likelihood
         r = self.observables['r']
+
         q = self.observables['q']
         q_err = self.observables['q_err']
         try:
@@ -242,17 +268,31 @@ class MeasurementModel():
                 q_model = getattr(self.profile, self.quantity)(r, **kwargs)
             except:
                 # and fail somewhat gracefully if that doesn't work
-                q_model = -np.inf * r
+                q_model = np.nan * r
         lnl = np.sum(self.lnlike(q_model, q, q_err))
 
-        if return_model:
-            q_grid = np.interp(r_grid, r, q_model)
+        if return_blobs:
+            kwargs = self._get_kwargs(sample)
+            blobs = []
             if return_lnlike:
-                return lnp + lnl, (lnl, q_grid)
-            else:
-                return lnp + lnl, (q_grid,)
+                blobs.append(lnl)
+            if return_profile:
+                q_grid = np.interp(r_grid, r, q_model)                
+                blobs.append(q_grid)
+            if return_vir:
+                z = kwargs['z']
+                rvir, Mvir = self.profile.RMDelta(z=z, mdef=mdef)
+                rs = kwargs['rs']
+                cvir = rvir / rs
+                blobs.append(Mvir)
+                blobs.append(cvir)
+            if return_sp:
+                rsp = optimize.fminbound(self.profile.densityDerivativeLog,
+                                         10**log_rsp_search_min,
+                                         10**log_rsp_search_max)
+                gamma_min = self.profile.densityDerivativeLog(rsp)
+                blobs.append(rsp)
+                blobs.append(gamma_min)
+            return lnp + lnl, tuple(blobs)
         else:
-            if return_lnlike:
-                return lnp + lnl, (lnl,)
-            else:
-                return lnp + lnl
+            return lnp + lnl

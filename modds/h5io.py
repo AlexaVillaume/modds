@@ -252,7 +252,6 @@ class HDF5Backend():
     /state/lnp : (nwalker, niter)-shaped array of log posterior values
     /state/lnl : (nwalker, niter)-shaped array of log likelihood values
 
-    /settings/z : redshift (float > 0)
     /settings/cosmo : Colossus cosmology (str, e.g., "planck15")
     /settings/quantity : one of {'density', 'enclosedMass', 'surfaceDensity',
                                  'deltaSigma'}
@@ -264,7 +263,7 @@ class HDF5Backend():
     filename : str
     model : MeasurementModel instance
     settings : dict
-        Keys should include z, cosmo, nwalkers, and r_grid.
+        Keys should include cosmo, nwalkers, and r_grid.
     """
 
     def __init__(self, filename=None, model=None, settings=None,
@@ -316,6 +315,14 @@ class HDF5Backend():
                            maxshape=(nwalkers, None), overwrite=overwrite)
         initialize_dataset(f, "/state/lnl", shape=(nwalkers, 0),
                            maxshape=(nwalkers, None), overwrite=overwrite)
+        initialize_dataset(f, "/state/Mvir", shape=(nwalkers, 0),
+                           maxshape=(nwalkers, None), overwrite=overwrite)
+        initialize_dataset(f, "/state/cvir", shape=(nwalkers, 0),
+                           maxshape=(nwalkers, None), overwrite=overwrite)
+        initialize_dataset(f, "/state/rsp", shape=(nwalkers, 0),
+                           maxshape=(nwalkers, None), overwrite=overwrite)
+        initialize_dataset(f, "/state/gamma_min", shape=(nwalkers, 0),
+                           maxshape=(nwalkers, None), overwrite=overwrite)
         initialize_dataset(f, "/state/ppc", shape=(nwalkers, 0, ngrid),
                            maxshape=(nwalkers, None, ngrid),
                            overwrite=overwrite)
@@ -323,8 +330,8 @@ class HDF5Backend():
         write_dataset(f, "/state/nacc", np.zeros(nwalkers),
                       overwrite=overwrite)
 
-    def append_state(self, pos, lnp=None, ppc=None, lnl=None,
-                     acceptances=None):
+    def append_state(self, pos, lnp=None, ppc=None, lnl=None, Mvir=None,
+                     cvir=None, rsp=None, gamma_min=None, acceptances=None):
         """Append sampling results to the existing datasets.
 
         Parameters
@@ -337,6 +344,15 @@ class HDF5Backend():
             shape of (nwalkers, ngrid) of posterior predictive checks
         lnl : array_like
             shape of (nwalkers,) of log likelihood values
+        Mvir : array_like
+            shape of (nwalkers,) of virial mass values
+        cvir : array_like
+            shape of (nwalkers,) of concentration values
+        rsp : array_like
+            shape of (nwalkers,) of splashback radius values
+        gamma_min : array_like
+            shape of (nwalkers,) of minimum gamma values
+
         acceptances : array_like
             shape of (nwalkers,) of acceptance counts (1 if accepted, 0 if not)
         """
@@ -366,8 +382,25 @@ class HDF5Backend():
                 x = f["/state/lnl"]
                 x.resize((x.shape[0], x.shape[1] + 1))
                 x[:, -1] = lnl
+            if Mvir is not None:
+                x = f["/state/Mvir"]
+                x.resize((x.shape[0], x.shape[1] + 1))
+                x[:, -1] = Mvir
+            if cvir is not None:
+                x = f["/state/cvir"]
+                x.resize((x.shape[0], x.shape[1] + 1))
+                x[:, -1] = cvir
+            if rsp is not None:
+                x = f["/state/rsp"]
+                x.resize((x.shape[0], x.shape[1] + 1))
+                x[:, -1] = rsp
+            if gamma_min is not None:
+                x = f["/state/gamma_min"]
+                x.resize((x.shape[0], x.shape[1] + 1))
+                x[:, -1] = gamma_min
             f.flush()
 
+            
     def sample(self, niter, pool=None):
         """Sample from the model for niter iterations, optionally with a user
         provided pool of workers.
@@ -375,8 +408,17 @@ class HDF5Backend():
         nwalkers = self.nwalkers
         ndim = self.ndim
         r_grid = self.r_grid
-        # save all the thing!
-        kwargs = dict(return_lnlike=True, return_model=True, r_grid=r_grid)
+        try:
+            mdef = read_dataset(self.filename, "/settings/mdef")
+        except:
+            mdef = "vir"
+        # save all the things!
+        kwargs = dict(return_lnlike=True,
+                      return_profile=True,
+                      return_vir=True,
+                      return_sp=True,
+                      r_grid=r_grid,
+                      mdef=mdef)
         sampler = emcee.EnsembleSampler(nwalkers, ndim, self.model, pool=pool,
                                         kwargs=kwargs)
         old_nacc = np.zeros(nwalkers)
@@ -396,11 +438,18 @@ class HDF5Backend():
                 rstate = result[2]
                 blobs = result[3]
                 new_lnl = np.array([blobs[i][0] for i in range(nwalkers)])
-                q_grid = np.vstack([blobs[i][1] for i in range(nwalkers)])
+                lens = [len(blobs[i][1]) for i in range(nwalkers)]
+                new_q_grid = np.vstack([blobs[i][1] for i in range(nwalkers)])
+                new_Mvir = np.array([blobs[i][2] for i in range(nwalkers)])
+                new_cvir = np.array([blobs[i][3] for i in range(nwalkers)])
+                new_rsp = np.array([blobs[i][4] for i in range(nwalkers)])
+                new_gamma_min = np.array([blobs[i][5] for i in range(nwalkers)])
                 delta_nacc = sampler.naccepted - old_nacc
                 # need to save as copy, default is a reference!
                 old_nacc = sampler.naccepted.copy()
-                self.append_state(new_pos, lnp=new_lnp, ppc=q_grid, lnl=new_lnl,
+                self.append_state(new_pos, lnp=new_lnp, ppc=new_q_grid,
+                                  lnl=new_lnl, Mvir=new_Mvir, cvir=new_cvir,
+                                  rsp=new_rsp, gamma_min=new_gamma_min,
                                   acceptances=delta_nacc)
                 pbar.update()
 
