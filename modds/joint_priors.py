@@ -21,9 +21,14 @@ def alpha_nu_gao08(profile, **kwargs):
     else:
         sigma_alpha = 0.1
     z = kwargs["z"]
-
-    M = profile.MDelta(z, "vir")
-    nu = peakHeight(M, z)
+    alpha = kwargs["alpha"]
+    
+    try:
+        M = profile.MDelta(z, "vir")
+        nu = peakHeight(M, z)
+    except:
+        # can't find peak height, reject model
+        return -np.inf
     alpha_model = 0.155 + 0.0095 * nu**2
 
     return lnlike_gauss(np.log10(alpha_model), np.log10(alpha), sigma_alpha)
