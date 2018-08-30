@@ -14,14 +14,16 @@ from modds.measurement import lnlike_gauss
 def alpha_nu_gao08(profile, **kwargs):
     """log normal distribution of alpha about the
     alpha--peak height relation from Gao+2008"""
-    
+
+    z = kwargs["z"]
+    alpha = kwargs["alpha"]
+
     # scatter in dex
     if "sigma_alpha" in kwargs:
         sigma_alpha = kwargs["sigma_alpha"]
     else:
-        sigma_alpha = 0.1
-    z = kwargs["z"]
-    alpha = kwargs["alpha"]
+        # take scatter from Dutton & Maccio 2014
+        sigma_alpha = 0.16 + 0.03 * z
     
     try:
         M = profile.MDelta(z, "vir")
