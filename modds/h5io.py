@@ -285,7 +285,7 @@ class HDF5Backend():
         colossus_version = get_version("colossus")
         if colossus_version != self.version:
             warnings.warn("Current version of colossus ({}) does not match that"
-                          " of the file ({})!".format(version, self.version))
+                          " of the file ({})!".format(colossus_version, self.version))
         self._model = read_object(filename, "model")
         self._observables = self.model.observables
         self._quantity = self.model.quantity
